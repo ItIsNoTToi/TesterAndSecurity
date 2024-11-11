@@ -143,9 +143,7 @@ exports.acceptfriend = async (req, res) => {
 
         // Tạo bạn bè mới
         const newFriend = new Friend({ User1: senderId, User2: requestId });
-        const newFriend2 = new Friend({ User2: senderId, User1: requestId });
         await newFriend.save();
-        await newFriend2.save();
 
         friendRequest.status = 'Accepted';
         await friendRequest.save();

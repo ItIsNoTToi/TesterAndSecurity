@@ -3,7 +3,6 @@ var router = express.Router();
 var userController = require('../../controllers/web/usercontroller');
 const passport = require('passport');
 
-/* GET login page. */
 router.get('/', userController.showLoginPage);
 router.post('/', userController.handleLogin);
 

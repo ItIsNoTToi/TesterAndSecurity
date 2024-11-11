@@ -16,6 +16,6 @@ const postmediaschema  = mongoose.Schema({
     },
 });
 
-const postmedia = mongoose.model('messagemedia', postmediaschema);
+const postmedia = mongoose.model('postmedia', postmediaschema);
 
-module.exports = messagemedia;
+module.exports = postmedia;

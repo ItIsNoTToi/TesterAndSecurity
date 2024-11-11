@@ -13,10 +13,14 @@ const cors = require('cors');
 
 const MongoStore = require('connect-mongo');
 
+const dotenv = require('dotenv');
+dotenv.config();
+
 // routes cho web
 var indexwebRouter = require('./routes/web/index');
 var userswebRouter = require('./routes/web/users');
 var loginwebRouter = require('./routes/web/login'); 
+var postwebRouter = require('./routes/web/post');
 var logoutwebRouter = require('./routes/web/logout');
 var registerwebRouter = require('./routes/web/register'); 
 var profilewebRouter = require('./routes/web/userprofile'); 
@@ -29,13 +33,14 @@ var messagewebRouter = require('./routes/web/message');
 var indexapiRouter = require('./routes/api/index');
 var usersapiRouter = require('./routes/api/users');
 var loginapiRouter = require('./routes/api/login');
+var postapiRouter = require('./routes/api/post'); 
 var logoutapiRouter = require('./routes/api/logout');
 var registerapiRouter = require('./routes/api/register');
 var profileapiRouter = require('./routes/api/userprofile');
 var friendapiRouter = require('./routes/api/userfriend');
 var communityapiRouter = require('./routes/api/community');
 var chatapiRouter = require('./routes/api/chat');
-var messageapiRouter = require('./routes/web/message'); 
+var messageapiRouter = require('./routes/api/message'); 
 
 // app.set
 app.set('views', path.join(__dirname, 'views'));
@@ -65,8 +70,8 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production', // Chỉ sử dụng cookie bảo mật trong môi trường production (HTTPS)
     httpOnly: true, // Bảo vệ cookie khỏi các tấn công XSS
-    maxAge:  1000 // Thời gian sống của session cookie (ví dụ: 60 giây)
-  }
+    maxAge: 60 * 1000 // Thời gian sống của session cookie (ví dụ: 60 giây)
+  }  
 }));
 
 app.use(passport.initialize());
@@ -77,6 +82,7 @@ app.use('/', indexwebRouter); // Đặt indexRouter ở đây để xử lý khi
 app.use('/manager', userswebRouter);
 app.use('/friend', friendwebRouter);
 app.use('/login', loginwebRouter);
+app.use('/post', postwebRouter);
 app.use('/logout', logoutwebRouter);
 app.use('/register', registerwebRouter);
 app.use('/profile', profilewebRouter);
@@ -89,6 +95,7 @@ app.use('/api', indexapiRouter); // Đặt indexRouter ở đây để xử lý 
 app.use('/api/user', usersapiRouter);
 app.use('/api/friend', friendapiRouter);
 app.use('/api/login', loginapiRouter);
+app.use('/api/post', postapiRouter);
 app.use('/api/logout', logoutapiRouter);
 app.use('/api/register', registerapiRouter);
 app.use('/api/profile', profileapiRouter);

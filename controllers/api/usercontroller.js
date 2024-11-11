@@ -1,5 +1,6 @@
 const bcrypt = require('bcrypt');
 const User = require('../../models/user/users');
+const { generateAccessToken, generateRefreshToken } = require('../../utils/auth');
 
 function IsEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -25,90 +26,94 @@ exports.showRegisterPage = (req, res) => {
 
 const loginAttempts = {};
 
-exports.handleLogin = async (req, res) => {
-    
+const MAX_ATTEMPTS = 5;
+const LOCK_TIME = 15 * 60 * 1000; // 15 phút
 
-    const { username, password } = req.body;
+// Đối tượng lưu trữ thông tin về số lần thử đăng nhập
+
+const checkLoginAttempts = (username) => {
     const currentTime = Date.now();
-    
-    // Thiết lập giới hạn
-    const MAX_ATTEMPTS = 5;
-    const LOCK_TIME = 15 * 60 * 1000; // 15 phút
-
-    // Kiểm tra số lần thử đăng nhập
     if (loginAttempts[username]) {
         const attempts = loginAttempts[username];
         if (attempts.count >= MAX_ATTEMPTS && (currentTime - attempts.firstAttempt < LOCK_TIME)) {
-            return res.status(429).json({ message: 'Too many login attempts. Please try again later.' });
+            return { locked: true, remainingTime: LOCK_TIME - (currentTime - attempts.firstAttempt) };
         }
+    }
+    return { locked: false };
+};
+
+const handleFailedLogin = (username) => {
+    const currentTime = Date.now();
+    if (!loginAttempts[username]) {
+        loginAttempts[username] = { count: 0, firstAttempt: currentTime };
+    }
+    loginAttempts[username].count++;
+};
+
+const handleSuccessfulLogin = (username) => {
+    // Reset login attempts on successful login
+    delete loginAttempts[username];
+};
+
+exports.handleLogin = async (req, res) => {
+    const { username, password } = req.body;
+
+    // Kiểm tra số lần thử đăng nhập
+    const { locked, remainingTime } = checkLoginAttempts(username);
+    if (locked) {
+        return res.status(429).json({ message: `Too many login attempts. Please try again later. Retry in ${Math.ceil(remainingTime / 1000)} seconds.` });
     }
 
     try {
         let user;
-        
-        user = await User.findOne({ email: username });
-        
-        if (user) {
-            if (user.role == 'user') {
-                const match = await bcrypt.compare(password, user.password);
-                if (match) {
-                    // Đặt lại số lần thử đăng nhập thành công
-                    delete loginAttempts[username];
-
-                    req.session.userId = user._id;
-                    req.session.user = { username: user.username, password: user.password };
-                    return res.status(200).json({ message: 'Login success with user', user: req.session.user, userId: req.session.userId, role: 'user' });
-                } else {
-                    // Cập nhật số lần thử đăng nhập không thành công
-                    if (!loginAttempts[username]) {
-                        loginAttempts[username] = { count: 0, firstAttempt: currentTime };
-                    }
-                    loginAttempts[username].count++;
-                    return res.status(401).json({ message: 'Incorrect password' });
-                }
-            } else if (user.role === 'admin') {
-                const match = await bcrypt.compare(password, user.password);
-                if (match) {
-                    // Đặt lại số lần thử đăng nhập thành công
-                    delete loginAttempts[username];
-
-                    req.session.userId = user._id;
-                    req.session.user = { username: user.username, password: user.password };
-                    return res.status(200).json({ message: 'Login success with admin', user: req.session.user, userId: req.session.userId, role: 'admin' });
-                } else {
-                    // Cập nhật số lần thử đăng nhập không thành công
-                    if (!loginAttempts[username]) {
-                        loginAttempts[username] = { count: 0, firstAttempt: currentTime };
-                    }
-                    loginAttempts[username].count++;
-                    return res.status(401).json({ message: 'Incorrect password' });
-                }
-            } else {
-                const match = await bcrypt.compare(password, user.password);
-                if (match) {
-                    // Đặt lại số lần thử đăng nhập thành công
-                    delete loginAttempts[username];
-
-                    req.session.userId = user._id;
-                    req.session.user = { username: user.username, password: user.password };
-                    return res.status(200).json({ message: 'Login success with moderator', user: req.session.user, userId: req.session.userId, role: 'moderator' });
-                } else {
-                    // Cập nhật số lần thử đăng nhập không thành công
-                    if (!loginAttempts[username]) {
-                        loginAttempts[username] = { count: 0, firstAttempt: currentTime };
-                    }
-                    loginAttempts[username].count++;
-                    return res.status(401).json({ message: 'Incorrect password' });
-                }
-            }
+        if (IsEmail(username)) {
+            user = await User.findOne({ email: username });
         } else {
+            user = await User.findOne({ username });
+        }
+
+        if (!user) {
             return res.status(401).json({ message: "User not found" });
         }
+
+        const match = await bcrypt.compare(password, user.password);
+        if (!match) {
+            handleFailedLogin(username); // Cập nhật lần thử đăng nhập không thành công
+            return res.status(401).json({ message: 'Incorrect password' });
+        }
+
+        handleSuccessfulLogin(username); // Đặt lại số lần thử đăng nhập sau khi đăng nhập thành công
+
+        req.session.userId = user._id;
+        req.session.user = { username: user.username, password: user.password };
+
+        const accessToken = generateAccessToken(user);
+        const refreshToken = generateRefreshToken(user);
+        
+        res.cookie('refresh_token', refreshToken, {
+            httpOnly: true,
+            secure: true, // Cần set true khi chạy trên HTTPS
+            sameSite: 'Strict',
+          });
+
+        const role = user.role || 'user'; // Default to 'user' role
+        console.log( `Login success with ${role}`,
+            req.session.user,
+            req.session.userId,
+            role,
+            accessToken);
+        return res.status(200).json({
+            message: `Login success with ${role}`,
+            role: role,
+            accessToken
+        });
+
     } catch (error) {
         console.error('Login error:', error);
         return res.status(500).json({ message: error.message });
     }
 };
+
 
 exports.handleRegister = async (req, res) => {
     const { username, email, phone, password } = req.body;

@@ -16,9 +16,7 @@
             return next();
         }
 
-        if (req.originalUrl && req.originalUrl.startsWith("/socket.io")) {
-            return next(new Error('Authentication error'));
-        } else {
+        else {
             return res.status(400).json({ message: 'Please log in to access' });
         }
     };

@@ -5,6 +5,6 @@ var postcontroller = require('../../controllers/api/postcontroller');
 
 router.get('/', authMiddleware, postcontroller.getpost)
 router.post('/pushpost', authMiddleware, postcontroller.pushpost);
-
+router.post('/like', authMiddleware, postcontroller.likepost);
 
 module.exports = router;

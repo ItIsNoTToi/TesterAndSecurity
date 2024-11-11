@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const User = require('../../models/user/users');
 const message = require('../../models/message/message');
 
+
 function IsEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -59,7 +60,7 @@ exports.handleLogin = async (req, res) => {
                 req.session.user = { username: user.username, password: user.password };
                 req.session.message = 'Access granted!';
                 await req.session.save(); // Ensure the session is saved before redirecting
-                return res.render('index', {message: user.username});
+                return res.redirect('/'); 
             } else {
                 // Cập nhật số lần thử đăng nhập không thành công
                 if (!loginAttempts[username]) {
